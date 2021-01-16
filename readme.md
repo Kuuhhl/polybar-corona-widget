@@ -2,14 +2,21 @@
 
 This widget allows you to show the current Coronavirus cases in your area.
 
-## Example
+## Example Screenshot
 
 ![screenshot](screenshots/example.png)
 
-## Setup
+## Dependencies
 
-1. Move `coronaWidgets.py` to your polybar-scripts path.
-2. Add script to polybar-config (`~/.config/polybar/config`)
+```
+python3
+```
+
+# Setup
+
+1. Install `python3` if you don't have it installed yet.
+2. Move `coronaWidgets.py` to your polybar-scripts path.
+3. Add script to polybar-config (`~/.config/polybar/config`)
 
 -   Add to modules-list:
     ![screenshot](screenshots/configScreenshot.png)
@@ -23,7 +30,7 @@ format = <label>
 exec = python ~/.config/polybar/scripts/coronaWidget.py united-states
 ```
 
-3. Customize arguments.
+4. Customize arguments.
 
 ## List of arguments:
 
@@ -70,6 +77,16 @@ python ~/.config/polybar/scripts/coronaWidget.py germany -p "Bayern" -ar -lo -pr
 
 1. Open `https://api.covid19api.com/live/country/`COUNTRY-NAME`/status/confirmed` in your browser and look for your province.
 2. Copy the `Province`-value of your province.
+
+# Uninstallation
+
+-   Remove cache-directory:
+
+```bash
+rm -r ~/.cache/coronaWidgetPolybar/
+```
+
+-   Delete `coronaWidget.py`
 
 # Contributing
 
