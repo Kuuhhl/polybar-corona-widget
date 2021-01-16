@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, json, urllib.request
+import argparse, json, urllib.request, os, locale
 
 # Create the parser
 my_parser = argparse.ArgumentParser()
@@ -45,89 +45,149 @@ my_parser.add_argument(
     "--up-arrow",
     help="Change the 'up'-arrow character.",
     dest="upArrow",
-    default="↗",
+    default=" ↗",
 )
 my_parser.add_argument(
     "-dw",
     "--down-arrow",
     help="Change the 'down'-arrow character.",
     dest="downArrow",
-    default="↘",
+    default=" ↘",
+)
+my_parser.add_argument(
+    "-lo",
+    "--enable-locale",
+    help="Enable decimal points.",
+    dest="locale",
+    action="store_true",
 )
 # Parse arguments
 args = my_parser.parse_args()
 
+# Define the path the cache goes to:
+cachePath = os.path.join(
+    os.path.join(os.environ.get("HOME"), ".cache"),
+    os.path.join(
+        "coronaWidgetPolybar",
+        "coronaCache",
+    ),
+)
 # Check cache file integrity:
 # Create new file with fallback entries
-# if it has bad syntax or if it doesn't exist yet.
+# if it has bad values or if it doesn't exist yet.
 try:
-    with open("coronaCache", "r") as f:
+    with open(cachePath, "r") as f:
         cachedData_json = json.loads(f.read())
     int(cachedData_json["number"])
-    str(cachedData_json["arrow"])
-except:
-    with open("coronaCache", "w") as f:
-        f.write(json.dumps({"number": 0, "arrow": args.upArrow}))
+    bool(cachedData_json["arrow"])
+
+    # Reset cache if changing country
+    if cachedData_json["country"] != args.country:
+        raise
+    # Reset cache if changing province
+    if cachedData_json["province"] != args.province:
+        raise
+except Exception as e:
+    # Create path for the file if we have to
+    if not os.path.exists(os.path.dirname(cachePath)):
+        os.makedirs(os.path.dirname(cachePath))
+    # Write fallback value
+    with open(cachePath, "w") as f:
+        f.write(
+            json.dumps(
+                {
+                    "country": args.country,
+                    "province": args.province,
+                    "number": 0,
+                    "arrow": f"{bool(True)}",
+                }
+            )
+        )
 
 
-try:
-    # Get the API-Response as JSON
-    with urllib.request.urlopen(
-        f"https://api.covid19api.com/live/country/{args.country}/status/confirmed"
-    ) as response:
-        json_response = json.loads(response.read().decode("utf-8"))
+# Get the API-Response as JSON
+with urllib.request.urlopen(
+    f"https://api.covid19api.com/live/country/{args.country}/status/confirmed"
+) as response:
+    json_response = json.loads(response.read().decode("utf-8"))
+    response_code = response.getcode()
 
-except TimeoutError:
-    # If we have no internet we use the cached file to fetch the data.
-    with open("coronaCache", "r") as f:
+if response_code != 200:
+    # If we have no internet / the API is down
+    # we use the cached file to fetch the data.
+    with open(cachePath, "r") as f:
         cachedData_json = json.loads(f.read())
-
         cachedNumber = cachedData_json["number"]
         cachedArrow = cachedData_json["arrow"]
-
-        # Print our string to polybar
-        print(f"{args.prefix}{cachedNumber}{cachedArrow}{args.suffix}")
-        # Don't continue script
-        exit()
+    # Print our string to polybar
+    print(f"{args.prefix}{cachedNumber}{cachedArrow}{args.suffix}")
+    # Don't continue script
+    exit()
 
 # We Parse the JSON here
 if args.province:
+    province = True
     # Get provice's case numbers if we provided one in arguments
     for province in json_response:
         if province["Province"] == args.province:
             number = province["Active"]
             break
 else:
+    province = False
     # Get numbers of all of the country:
     # add together all cases in provinces of country
     number = 0
     for province in json_response:
         number += province["Active"]
 
+
 # Fallback value for arrow if
 # it doesn't get specified below
 arrow = ""
 
+# Only show arrow if not disabled in arguments
 if not args.arrow:
-    with open("coronaCache", "r") as f:
+    # Load data from cache to have
+    # something to compare to
+    with open(cachePath, "r") as f:
         cachedData_json = json.loads(f.read())
         cachedNumber = cachedData_json["number"]
-        cachedArrow = cachedData_json["arrow"]
+        cachedArrowBool = bool(cachedData_json["arrow"])
 
-    # Get the correct arrow for the tweet
-    if cachedNumber != number:
+    # Get the correct arrow to display
+    # arrowBool: True is up; False is down
+    if cachedNumber == number:
+        arrowBool = cachedArrowBool
+    else:
         if number > cachedNumber:
-            arrow = args.upArrow
+            arrowBool = True
 
         elif number < cachedNumber:
-            arrow = args.downArrow
+            arrowBool = False
+
+    # Get the correct arrow symbol
+    if arrowBool == True:
+        arrowStr = args.upArrow
     else:
-        arrow = cachedArrow
-
-# Print result to polybar
-print(f"{args.prefix}{number}{arrow}{args.suffix}")
-
+        arrowStr = args.downArrow
 
 # Save cache to file
-with open("coronaCache", "w") as f:
-    f.write(json.dumps({"number": number, "arrow": arrow}))
+with open(cachePath, "w") as f:
+    f.write(
+        json.dumps(
+            {
+                "country": args.country,
+                "province": args.province,
+                "number": number,
+                "arrow": f"{arrowBool}",
+            }
+        )
+    )
+
+# Print with locale seperators if wanted
+if args.locale:
+    locale.setlocale(locale.LC_ALL, "")
+    number = "{0:n}".format(number)
+
+# Print result to polybar
+print(f"{args.prefix}{number}{arrowStr}{args.suffix}")
