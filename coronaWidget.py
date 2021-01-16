@@ -6,11 +6,8 @@ my_parser = argparse.ArgumentParser()
 
 # Add the arguments
 my_parser.add_argument(
-    "-c",
-    "--country",
+    "country",
     help="Specify the country you want to display.",
-    dest="country",
-    required=True,
 )
 
 my_parser.add_argument(
@@ -35,8 +32,8 @@ my_parser.add_argument(
 )
 my_parser.add_argument(
     "-ar",
-    "--disable-arrow",
-    help="Disable the arrow icon.",
+    "--enable-arrow",
+    help="Enable the arrow icon.",
     dest="arrow",
     action="store_true",
 )
@@ -87,7 +84,7 @@ try:
     # Reset cache if changing province
     if cachedData_json["province"] != args.province:
         raise
-except Exception as e:
+except:
     # Create path for the file if we have to
     if not os.path.exists(os.path.dirname(cachePath)):
         os.makedirs(os.path.dirname(cachePath))
@@ -141,35 +138,29 @@ else:
         number += province["Active"]
 
 
-# Fallback value for arrow if
-# it doesn't get specified below
-arrow = ""
+# Load data from cache to have
+# something to compare to
+with open(cachePath, "r") as f:
+    cachedData_json = json.loads(f.read())
+    cachedNumber = cachedData_json["number"]
+    cachedArrowBool = bool(cachedData_json["arrow"])
 
-# Only show arrow if not disabled in arguments
-if not args.arrow:
-    # Load data from cache to have
-    # something to compare to
-    with open(cachePath, "r") as f:
-        cachedData_json = json.loads(f.read())
-        cachedNumber = cachedData_json["number"]
-        cachedArrowBool = bool(cachedData_json["arrow"])
+# Get the correct arrow to display
+# arrowBool: True is up; False is down
+if cachedNumber == number:
+    arrowBool = cachedArrowBool
+else:
+    if number > cachedNumber:
+        arrowBool = True
 
-    # Get the correct arrow to display
-    # arrowBool: True is up; False is down
-    if cachedNumber == number:
-        arrowBool = cachedArrowBool
-    else:
-        if number > cachedNumber:
-            arrowBool = True
+    elif number < cachedNumber:
+        arrowBool = False
 
-        elif number < cachedNumber:
-            arrowBool = False
-
-    # Get the correct arrow symbol
-    if arrowBool == True:
-        arrowStr = args.upArrow
-    else:
-        arrowStr = args.downArrow
+# Get the correct arrow symbol
+if arrowBool == True:
+    arrowStr = args.upArrow
+else:
+    arrowStr = args.downArrow
 
 # Save cache to file
 with open(cachePath, "w") as f:
@@ -183,7 +174,9 @@ with open(cachePath, "w") as f:
             }
         )
     )
-
+# Don't print arrow if not enabled
+if not args.arrow:
+    arrowStr = ""
 # Print with locale seperators if wanted
 if args.locale:
     locale.setlocale(locale.LC_ALL, "")
